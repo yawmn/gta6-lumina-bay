@@ -59,7 +59,10 @@
       truck.mesh.position.set(154, 0, 414); truck.mesh.rotation.y = -0.4;
       game.missions.index = 1; game.missions.step = 0;
       game.hud.banner('MISSION PASSED!', '+$5,000  ·  GAME SAVED');
-      lookAt(game, 136, 8, 442, 141, 1.5, 398);
+      // Aim right of the safehouse so the 3D SAFEHOUSE sign lands fully left
+      // of the centered HTML banner (was overlapping the sign's final E),
+      // and look slightly up so the sign also sits below the banner's band.
+      lookAt(game, 136, 8, 442, 152, 3.5, 398);
     }
     game.frozen = true;
     game.hud.update(game);
