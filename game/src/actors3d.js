@@ -111,7 +111,7 @@ export function makeCarMesh(car) {
 
 export function createEffects(scene) {
   const tracers = [];
-  const tracerMat = new THREE.MeshBasicMaterial({ color: '#ffd60a', transparent: true, opacity: 0.9 });
+  const tracerMat = new THREE.MeshBasicMaterial({ color: '#fff3a0', transparent: true, opacity: 1 });
   for (let i = 0; i < 24; i += 1) {
     const mesh = new THREE.Mesh(boxGeo, tracerMat);
     mesh.visible = false;
@@ -159,7 +159,7 @@ export function createEffects(scene) {
       const dz = to.z - from.z;
       const len = Math.hypot(dx, dy, dz) || 1;
       t.mesh.position.set((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
-      t.mesh.scale.set(len, 2.6, 2.6);
+      t.mesh.scale.set(len, 4.5, 4.5);
       // The tracer box is long on local X: rotate Y so X lies along the shot.
       t.mesh.rotation.set(0, -Math.atan2(dz, dx), 0);
       t.mesh.visible = true;

@@ -76,7 +76,17 @@ export function stageShot(name, state) {
     state.interactPrompt = '[E] STEAL CAR';
     // Hold the trigger for a moment so shots are actually fired (ammo 12 -> 8).
     simulate(state, 1.2, { axes: { forward: 0, strafe: 0, sprint: false, handbrake: false }, mouse: { x: 900, y: 360, down: true } });
-    // Leave two fresh tracers in the air for the frame.
+    // Leave two fresh tracers in the air for the frame. Shots fired along
+    // the camera's view axis foreshorten to a dot, so send one bullet
+    // sideways first (pushed first, the muzzle flash still lands on the
+    // near bullet below): its tracer crosses the road as a visible line.
+    const la = state.player.angle + Math.PI / 2.3;
+    state.bullets.push({
+      x: state.player.x + Math.cos(la) * 120,
+      y: state.player.y + Math.sin(la) * 120,
+      vx: Math.cos(la) * 900, vy: Math.sin(la) * 900,
+      damage: 34, fromPlayer: true, life: 0.4,
+    });
     const a = state.player.angle;
     for (const dist of [60, 150]) {
       state.bullets.push({
@@ -139,9 +149,11 @@ export function stageShot(name, state) {
     state.saveNotice = 2.5;
     // Cinematic three-quarter view: player small at the safehouse, sign and
     // street behind him, instead of the follow camera right on his back.
+    // Camera panned slightly left so the neon SAFEHOUSE sign sits clear of
+    // the MISSION PASSED banner's right edge.
     return {
       screen: SCREEN_PLAY,
-      cinematic: { pos: { x: -860, y: 75, z: 740 }, look: { x: -1050, y: 45, z: 640 } },
+      cinematic: { pos: { x: -860, y: 75, z: 740 }, look: { x: -1060, y: 45, z: 658 } },
     };
   }
   // start (default): the title screen over a living city, wide sunset shot.

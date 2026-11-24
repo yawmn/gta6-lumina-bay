@@ -202,7 +202,7 @@ export function createRenderer(canvas) {
     // Bullets: a tracer from each bullet back along its path.
     for (const bullet of state.bullets) {
       const speed = Math.hypot(bullet.vx, bullet.vy) || 1;
-      const back = 45 / speed; // short streak — must not cross the player/camera
+      const back = 70 / speed; // longer streak — must read at thumbnail size
       const from = new THREE.Vector3(bullet.x - WORLD.width / 2 - bullet.vx * back, 16, bullet.y - WORLD.height / 2 - bullet.vy * back);
       const to = new THREE.Vector3(bullet.x - WORLD.width / 2, 16, bullet.y - WORLD.height / 2);
       effects.spawnTracer(from, to);

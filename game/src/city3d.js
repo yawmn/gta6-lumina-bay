@@ -259,7 +259,7 @@ export function buildCity(scene, world, random) {
     scene.add(mesh);
     return mesh;
   }
-  city.signs.safehouse = sign('SAFEHOUSE', L.safehouse.x, L.safehouse.y - 60, 52);
+  city.signs.safehouse = sign('SAFEHOUSE', L.safehouse.x, L.safehouse.y - 60, 62);
   city.signs.spray = sign('PAY & SPRAY', L.paySpray.x, L.paySpray.y - 55, 46);
   city.signs.pier = sign('PIER 9', 2920, 300, 60);
 
