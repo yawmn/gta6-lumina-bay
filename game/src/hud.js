@@ -36,6 +36,7 @@
         if (text) { els.prompt.textContent = text; els.prompt.style.display = 'block'; }
         else els.prompt.style.display = 'none';
       },
+      setHint: function (html) { els.hint.innerHTML = html; },
       banner: function (title, sub) {
         els.bannerTitle.textContent = title; els.bannerSub.textContent = sub || '';
         els.banner.style.display = 'block'; bannerTimer = 3.2;

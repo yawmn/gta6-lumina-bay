@@ -16,7 +16,9 @@
     game.money = 250;
     if (name === 'start') {
       game.state = 'title';
-      game.hud.showTitle(null);
+      // Simulate a save in slot 1 at mission 2, so the title shows a live
+      // LOAD SAVE line instead of (NO SAVE YET).
+      game.hud.showTitle({ mission: 1 });
       game.player.x = S.player.x; game.player.z = S.player.z; game.player.yaw = 0.6;
       game.player.mesh.position.set(game.player.x, 0, game.player.z);
       game.player.mesh.rotation.y = game.player.yaw;
@@ -32,6 +34,9 @@
       var from = new THREE.Vector3(7, 1.5, 344);
       var to = new THREE.Vector3(10, 1.4, 329);
       game.combat.spawnTracer(from, to);
+      // The tracer is a fired shot: ammo spent (9/60) and the shot raised
+      // one wanted star, so the combat reads as real mechanics, not a prop.
+      game.ammo = 9; game.weapons[0].ammo = 9; game.wanted.level = 1;
       var ped = game.peds.peds[0]; ped.x = -4; ped.z = 332; ped.flee = 3;
       game.hud.setPrompt('[E] STEAL CAR');
       lookAt(game, -4, 4.5, 356, 5, 1.5, 336);
@@ -49,6 +54,9 @@
       var r2 = G.makeCar('police'); r2.position.set(8, 0, 112); r2.rotation.y = Math.PI / 2; game.scene.add(r2);
       game.wanted.roadblock = [{ mesh: r1 }, { mesh: r2 }];
       var taxi = game.parked.taxi; taxi.mesh.position.set(3, 0, 82); taxi.mesh.rotation.y = 0.05;
+      // Driving shot: the controls hint must show driving controls, not the
+      // on-foot ones.
+      game.hud.setHint('W/S drive · A/D steer · SPACE handbrake · ESC pause<br>E exit car · drag mouse to look');
       lookAt(game, 0, 8, 14, 0, 1.5, 62);
     } else if (name === 'mission') {
       // At the safehouse: MISSION PASSED banner, $5,250, truck parked behind.
