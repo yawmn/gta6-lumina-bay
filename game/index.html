@@ -1,83 +1,105 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IRON BAYOU: RUSTLINE — Cinderport</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #game { width: 100vw; height: 100vh; display: block; touch-action: none; }
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  #hud { position: fixed; inset: 0; pointer-events: none; color: #f2f4f6; z-index: 5; }
-  .panel { background: rgba(15, 19, 26, 0.94); border: 1px solid rgba(255,255,255,0.09); border-radius: 6px; padding: 10px 14px; }
-  #hud-topleft { position: absolute; top: 14px; left: 14px; }
-  #hud-money { font-size: 28px; font-weight: 800; color: #2ec4b6; line-height: 1; }
-  #hud-district { font-size: 12px; letter-spacing: 2px; color: #9aa3b0; margin-top: 4px; }
-  #hud-topcenter { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; max-width: 560px; }
-  #hud-mission-label { font-size: 13px; font-weight: 800; color: #ffd60a; letter-spacing: 2px; }
-  #hud-objective { font-size: 15px; margin-top: 2px; }
-  #hud-radio { font-size: 12px; color: #ffd60a; margin-top: 4px; letter-spacing: 1px; }
-  #hud-topright { position: absolute; top: 14px; right: 14px; text-align: right; }
-  #hud-stars { font-size: 22px; letter-spacing: 2px; line-height: 1; }
-  #hud-stars .star-on { color: #ff2a3c; }
-  #hud-stars .star-off { color: #5a6068; }
-  .bar { width: 180px; height: 10px; background: rgba(255,255,255,0.14); border-radius: 5px; margin-top: 6px; margin-left: auto; overflow: hidden; }
-  #hud-hp { height: 100%; background: #37c978; width: 100%; }
-  #hud-armor { height: 100%; background: #7fa8c9; width: 0%; }
-  .bar-label { font-size: 10px; color: #9aa3b0; letter-spacing: 1px; margin-top: 2px; }
-  #hud-save { color: #2ec4b6; font-weight: 700; font-size: 13px; margin-top: 6px; }
-  #hud-minimap { position: absolute; left: 14px; bottom: 14px; padding: 8px; }
-  #minimap { display: block; width: 176px; height: 132px; }
-  #minimap-district { text-align: center; font-size: 12px; letter-spacing: 2px; color: #9aa3b0; margin-top: 6px; }
-  #hud-weaponbox { position: absolute; right: 14px; bottom: 14px; text-align: right; max-width: 340px; }
-  #hud-weapon { font-size: 18px; font-weight: 800; letter-spacing: 1px; }
-  #hud-ammo { font-size: 20px; font-weight: 800; color: #ffd60a; }
-  #hud-controls { font-size: 12px; color: #9aa3b0; margin-top: 4px; }
-  #hud-crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 3px solid rgba(255,255,255,0.85); border-radius: 50%; }
-  #hud-crosshair::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #ffd60a; border-radius: 50%; }
-  #hud-prompt { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); font-size: 17px; font-weight: 800; color: #ffd60a; letter-spacing: 1px; text-shadow: 0 2px 6px #000; background: rgba(12, 15, 22, 0.88); padding: 6px 14px; border-radius: 6px; }
-  #hud-banner { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); text-align: center; padding: 16px 34px; background: rgba(12, 15, 22, 0.96); }
-  #hud-banner .big { font-size: 44px; font-weight: 900; color: #ffd60a; letter-spacing: 2px; }
-  #hud-banner-sub { font-size: 16px; margin-top: 4px; }
-  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.55); z-index: 10; }
-  .overlay .card { background: rgba(12, 15, 20, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 34px 48px; text-align: center; max-width: 640px; }
-  .overlay h1 { margin: 0; font-size: 54px; line-height: 1.05; letter-spacing: 2px; color: #f2f4f6; }
-  .overlay h1 .y { color: #ffd60a; }
-  .overlay p { color: #c8ccd4; font-size: 16px; line-height: 1.5; }
-  .overlay .cta { color: #2ec4b6; font-size: 22px; font-weight: 800; margin-top: 18px; letter-spacing: 1px; }
-  .overlay .sub { color: #9aa3b0; font-size: 13px; margin-top: 12px; }
-  #title-loadsave { color: #ffd60a; font-size: 17px; font-weight: 700; margin-top: 10px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #14161a;
+    font-family: Arial, Helvetica, sans-serif; color: #fff; }
+  #game { display: block; width: 100vw; height: 100vh; }
+  .hud { position: absolute; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+  #hud-topleft { top: 14px; left: 16px; font-weight: bold; font-size: 20px; line-height: 1.35; }
+  #hud-money { color: #2ec4b6; font-size: 26px; }
+  #hud-weapon { color: #ffd60a; }
+  #hud-topright { top: 14px; right: 16px; text-align: right; font-size: 20px; }
+  .stars { color: #ffd60a; font-size: 26px; letter-spacing: 2px; }
+  .stars.hot { color: #ff2a3c; }
+  .stars.flash { animation: starflash .25s ease 2; }
+  @keyframes starflash { 50% { transform: scale(1.25); } }
+  #hud-objective { top: 14px; left: 50%; transform: translateX(-50%); max-width: 560px;
+    text-align: center; font-size: 17px; font-weight: bold; color: #ffd60a;
+    background: rgba(12,15,22,.72); padding: 7px 14px; border-radius: 6px; }
+  #hud-radio { top: 96px; right: 16px; font-size: 15px; color: #9fd8ff; display: none; }
+  #hud-minimap-wrap { position: absolute; right: 16px; bottom: 16px; text-align: right; }
+  #minimap { border: 2px solid rgba(255,255,255,.55); border-radius: 4px; background: #10141a; }
+  #hud-district { font-size: 15px; font-weight: bold; color: #fff; margin-top: 4px; }
+  #hud-hint { left: 16px; bottom: 16px; font-size: 14px; color: #cfd6de; line-height: 1.5;
+    background: rgba(12,15,22,.6); padding: 8px 10px; border-radius: 6px; }
+  #hud-prompt { left: 50%; bottom: 110px; transform: translateX(-50%); display: none;
+    background: rgba(12,15,22,.88); color: #ffd60a; font-weight: bold; font-size: 20px;
+    padding: 10px 18px; border-radius: 8px; border: 1px solid rgba(255,214,10,.5); }
+  #crosshair { left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%,-50%);
+    display: none; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #hud-banner { left: 50%; top: 17%; transform: translateX(-50%); display: none; text-align: center;
+    background: rgba(12,15,22,.96); border: 2px solid #ffd60a; border-radius: 10px;
+    padding: 18px 34px; }
+  #banner-title { font-size: 40px; font-weight: bold; color: #ffd60a; letter-spacing: 2px; }
+  #banner-sub { font-size: 19px; color: #2ec4b6; margin-top: 6px; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; background: rgba(8,10,14,.45); pointer-events: none; }
+  #screen-title .panel { background: rgba(12,15,22,.95); border: 2px solid #f5b700;
+    border-radius: 12px; padding: 30px 44px; }
+  #screen-title h1 { font-size: 52px; color: #f5b700; letter-spacing: 3px; }
+  #screen-title h2 { font-size: 22px; color: #ff9a3c; letter-spacing: 8px; margin: 6px 0 18px; }
+  #screen-title p { font-size: 17px; line-height: 1.7; color: #e8ecf0; }
+  #screen-title .keys { color: #ffd60a; font-weight: bold; }
+  #screen-pause, #screen-wasted, #fatal { display: none; }
+  #screen-pause h1, #screen-wasted h1 { font-size: 54px; letter-spacing: 4px; }
+  #screen-wasted h1 { color: #ff2a3c; }
+  #screen-pause p, #screen-wasted p { font-size: 18px; margin-top: 12px; color: #cfd6de; }
+  #fatal { background: rgba(8,10,14,.9); }
 </style>
 </head>
 <body>
-<canvas id="game" width="1280" height="720" aria-label="Iron Bayou Rustline: drive and fight through Cinderport, an open-world crime game"></canvas>
-<p id="status" role="status" aria-live="polite"></p>
-<div id="hud">
-  <div id="hud-topleft" class="panel"><div id="hud-money">$250</div><div id="hud-district">SLAGTOWN</div></div>
-  <div id="hud-topcenter" class="panel"><div id="hud-mission-label">MISSION 1 / 3</div><div id="hud-objective">Go to PIER 9 and find the syndicate cargo truck</div><div id="hud-radio">♪ RUST FM 94.2</div></div>
-  <div id="hud-topright" class="panel"><div id="hud-stars"></div><div class="bar"><div id="hud-hp"></div></div><div class="bar-label">HP</div><div class="bar"><div id="hud-armor"></div></div><div class="bar-label">ARMOR</div><div id="hud-save">✓ GAME SAVED</div></div>
-  <div id="hud-minimap" class="panel"><canvas id="minimap" width="176" height="132"></canvas><div id="minimap-district">SLAGTOWN</div></div>
-  <div id="hud-weaponbox" class="panel"><div id="hud-weapon">PISTOL</div><div id="hud-ammo">12 / 96</div><div id="hud-controls">WASD Move · Click Shoot · E Enter</div></div>
-  <div id="hud-crosshair"></div>
-  <div id="hud-prompt"></div>
-  <div id="hud-banner" class="panel" style="display:none"><div class="big" id="hud-banner-big">MISSION PASSED!</div><div id="hud-banner-sub"></div></div>
+<canvas id="game" width="1280" height="720"></canvas>
+<div class="hud" id="hud-topleft">
+  <div id="hud-money">$250</div>
+  <div><span id="hud-hp">HP 100</span> · <span id="hud-armor">ARMOR 50</span></div>
+  <div><span id="hud-weapon">PISTOL</span> · <span id="hud-ammo">12 / 60</span></div>
 </div>
-<div id="screen-title" class="overlay"><div class="card">
-  <h1><span class="y">IRON BAYOU</span><br>RUSTLINE</h1>
-  <p>An open-world crime game in Cinderport.<br>Vance is back. The Ironclad Syndicate took his routes.<br>Take them back — one mission at a time.</p>
-  <div class="cta">▶ ENTER — NEW GAME</div>
-  <div id="title-loadsave">L — LOAD SAVE (SLOT 1 · MISSION 2)</div>
-  <div class="sub">WASD move · Mouse aim · Click shoot · E enter / steal car · R reload · M mute · Esc pause</div>
+<div class="hud" id="hud-topright"><span class="stars" id="hud-stars">☆☆☆☆☆</span></div>
+<div class="hud" id="hud-objective">M1 — Steal the armored cargo truck at Pier 9</div>
+<div class="hud" id="hud-radio">♪ RUST FM 94.2</div>
+<div id="hud-minimap-wrap"><canvas id="minimap" width="180" height="130"></canvas>
+  <div id="hud-district">CINDERPORT</div></div>
+<div class="hud" id="hud-hint">WASD move · SHIFT sprint · CLICK shoot · R reload · 1-3 weapon<br>
+  E enter / steal car · SPACE handbrake · ESC pause · drag mouse to look</div>
+<div class="hud" id="hud-prompt"></div>
+<div class="hud" id="crosshair"></div>
+<div class="hud" id="hud-banner"><div id="banner-title">MISSION PASSED!</div><div id="banner-sub"></div></div>
+<div class="screen" id="screen-title"><div class="panel">
+  <h1>IRON BAYOU</h1><h2>RUSTLINE · CINDERPORT</h2>
+  <p><span class="keys">ENTER</span> — NEW GAME</p>
+  <p id="load-line">L — LOAD SAVE (SLOT 1 · MISSION 1)</p>
+  <p style="margin-top:14px">Vance, a smuggler driver framed by the Ironclad Syndicate,<br>
+  takes back Cinderport's three distribution routes — one heist at a time.</p>
+  <p style="margin-top:10px; font-size:14px; color:#9fb0c0">WASD move · mouse drag to look · CLICK shoot · E steal cars<br>
+  Missions, wanted stars, police chases, Pay &amp; Spray — the full open world.</p>
 </div></div>
-<div id="screen-pause" class="overlay" style="display:none"><div class="card">
-  <h1>PAUSED</h1>
-  <p>Cinderport waits. Press Esc to keep playing.</p>
-</div></div>
-<div id="screen-over" class="overlay" style="display:none"><div class="card">
-  <h1><span class="y">WASTED</span></h1>
-  <p>Vance went down. Press Enter to start again.</p>
-</div></div>
-<script src="./vendor/three.min.js"></script>
-<script type="module" src="./src/main.js"></script>
+<div class="screen" id="screen-pause"><h1>PAUSED</h1><p>ESC — resume</p></div>
+<div class="screen" id="screen-wasted"><h1>WASTED</h1><p>Vance got caught slippin'. ENTER — try again</p></div>
+<div class="screen" id="fatal"><h1>WEBGL UNAVAILABLE</h1><p>This game needs a browser with WebGL.</p></div>
+<script src="vendor/three.min.js"></script>
+<script src="src/config.js"></script>
+<script src="src/random.js"></script>
+<script src="src/textures.js"></script>
+<script src="src/world.js"></script>
+<script src="src/city.js"></script>
+<script src="src/actors.js"></script>
+<script src="src/traffic.js"></script>
+<script src="src/wanted.js"></script>
+<script src="src/combat.js"></script>
+<script src="src/missions.js"></script>
+<script src="src/save.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/input.js"></script>
+<script src="src/hud.js"></script>
+<script src="src/shots.js"></script>
+<script src="src/main.js"></script>
 </body>
 </html>

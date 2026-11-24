@@ -1,166 +1,68 @@
-// The screenshot scenes behind ?shot=start|steal|chase|mission (3D). Each one
-// starts from a fresh seeded game and stages one real moment of it — the same
-// rules, the same city, a fixed scripted setup — so the frame is what the game
-// really looks like and the same seed always gives the same frame. Gemini's
-// pre-submit fixes are baked in: money $250 → $250 → $5,250, wanted ★2 → ★4 →
-// ★0, a combat tracer with reduced ammo in the steal scene, and a LOAD SAVE
-// line on the title screen.
-
-import { STEP } from './config.js';
-import { SCREEN_PLAY, SCREEN_TITLE } from './render3d.js';
-import { enterNearestCar, updateGame } from './update.js';
-import { addWanted } from './WantedSystem.js';
-import { spawnGuard } from './CombatSystem.js';
-
-const IDLE_INPUT = { axes: { forward: 0, strafe: 0, sprint: false, handbrake: false }, mouse: { x: 640, y: 360, down: false } };
-
-function simulate(state, seconds, input) {
-  const steps = Math.round(seconds / STEP);
-  for (let i = 0; i < steps; i += 1) updateGame(state, input ?? IDLE_INPUT, STEP);
-}
-
-function placePlayerCar(state, type, x, y, angle, speed) {
-  const car = {
-    id: 7000 + state.cars.length, type, x, y, angle, speed,
-    targetSpeed: 0, color: type === 'police' ? '#1d2f45' : '#c23b2e',
-    isTraffic: false, isPolice: type === 'police', isPlayer: type !== 'police',
-    hp: 500, missionTruck: false,
-  };
-  state.cars.push(car);
-  if (type !== 'police') {
-    state.player.car = car;
-    state.player.onFoot = false;
-    state.player.x = x;
-    state.player.y = y;
-    state.player.angle = angle;
+// Deterministic shot staging for ?shot=start|steal|chase|mission&seed=1.
+// Each shot freezes the simulation after staging so the frame is identical
+// every run; main.js sets window.__shotReady after a few rendered frames.
+(function () {
+  'use strict';
+  var G = window.IB = window.IB || {};
+  function lookAt(game, px, py, pz, tx, ty, tz) {
+    game.camera.position.set(px, py, pz);
+    game.camera.lookAt(tx, ty, tz);
+    game.camYaw = Math.atan2(-(tx - px), -(tz - pz));
   }
-  return car;
-}
-
-function placePoliceChase(state, px, py, angle) {
-  const spots = [
-    { x: px - 330, y: py + 175, a: angle },
-    { x: px - 390, y: py - 165, a: angle },
-    { x: px + 240, y: py + 170, a: angle + Math.PI },
-  ];
-  for (const s of spots) placePlayerCar(state, 'police', s.x, s.y, s.a, 380);
-}
-
-export function stageShot(name, state) {
-  const L = state.world.landmarks;
-  if (name === 'steal') {
-    // On foot beside a red sedan in downtown traffic, firing at a police car
-    // (tracer + muzzle flash visible, ammo down to 8/96), peds fleeing. The
-    // camera sits behind-left so the player, the sedan and the police car are
-    // all in frame and no traffic car blocks the view.
-    state.player.x = 1560;
-    state.player.y = 1330;
-    state.player.angle = -0.18;
-    state.camYaw = 0.27;
-    state.cars.push({
-      id: 7101, type: 'sedan', x: 1620, y: 1400, angle: 0, speed: 0, targetSpeed: 0,
-      color: '#c23b2e', isTraffic: false, isPolice: false, isPlayer: false, hp: 100,
-    });
-    const cop = {
-      id: 7103, type: 'police', x: 1780, y: 1290, angle: Math.PI, speed: 0, targetSpeed: 0,
-      color: '#1d2f45', isTraffic: false, isPolice: true, isPlayer: false, hp: 500,
-    };
-    state.cars.push(cop);
-    for (const ped of state.peds.slice(0, 4)) {
-      ped.x = 1500 + state.random() * 200;
-      ped.y = 1300 + state.random() * 120;
-      ped.flee = 2.5;
+  G.stageShot = function (game, name) {
+    var S = game.world.spawns;
+    game.state = 'playing';
+    game.hud.hideTitle(); game.hud.showPause(false); game.hud.showWasted(false);
+    game.money = 250;
+    if (name === 'start') {
+      game.state = 'title';
+      game.hud.showTitle(null);
+      game.player.x = S.player.x; game.player.z = S.player.z; game.player.yaw = 0.6;
+      game.player.mesh.position.set(game.player.x, 0, game.player.z);
+      game.player.mesh.rotation.y = game.player.yaw;
+      lookAt(game, 300, 130, 460, -40, 40, -120);
+    } else if (name === 'steal') {
+      // Player on foot next to the red sedan on avenue x=0, guard ahead,
+      // tracer mid-flight, [E] STEAL CAR pill on screen, a pedestrian fleeing.
+      var sedan = game.parked.sedan;
+      sedan.mesh.position.set(2, 0, 340); sedan.mesh.rotation.y = -0.5;
+      game.player.x = 6; game.player.z = 346; game.player.yaw = 2.4;
+      game.player.mesh.position.set(6, 0, 346); game.player.mesh.rotation.y = 2.4;
+      var guard = G.makeGuard(10, 328, false); game.enemies.push(guard); game.scene.add(guard.mesh);
+      var from = new THREE.Vector3(7, 1.5, 344);
+      var to = new THREE.Vector3(10, 1.4, 329);
+      game.combat.spawnTracer(from, to);
+      var ped = game.peds.peds[0]; ped.x = -4; ped.z = 332; ped.flee = 3;
+      game.hud.setPrompt('[E] STEAL CAR');
+      lookAt(game, -4, 4.5, 356, 5, 1.5, 336);
+    } else if (name === 'chase') {
+      // Player driving the red sedan, two police flanking, roadblock ahead, ★4.
+      var car = game.parked.sedan;
+      car.mesh.position.set(0, 0, 40); car.mesh.rotation.y = 0; car.speed = 24; car.driven = true;
+      game.car = car; game.player.mesh.visible = false;
+      game.player.x = 0; game.player.z = 40; game.player.yaw = 0;
+      game.wanted.level = 4; game.wanted.heat = 100;
+      var p1 = G.makeCar('police'); p1.position.set(-7, 0, 34); p1.rotation.y = 0.1; game.scene.add(p1);
+      var p2 = G.makeCar('police'); p2.position.set(7, 0, 36); p2.rotation.y = -0.1; game.scene.add(p2);
+      game.wanted.police = [{ mesh: p1, speed: 24 }, { mesh: p2, speed: 24 }];
+      var r1 = G.makeCar('police'); r1.position.set(-8, 0, 112); r1.rotation.y = Math.PI / 2; game.scene.add(r1);
+      var r2 = G.makeCar('police'); r2.position.set(8, 0, 112); r2.rotation.y = Math.PI / 2; game.scene.add(r2);
+      game.wanted.roadblock = [{ mesh: r1 }, { mesh: r2 }];
+      var taxi = game.parked.taxi; taxi.mesh.position.set(3, 0, 82); taxi.mesh.rotation.y = 0.05;
+      lookAt(game, 0, 8, 14, 0, 1.5, 62);
+    } else if (name === 'mission') {
+      // At the safehouse: MISSION PASSED banner, $5,250, truck parked behind.
+      game.money = 5250;
+      game.player.x = 140; game.player.z = 404; game.player.yaw = Math.PI;
+      game.player.mesh.position.set(140, 0, 404); game.player.mesh.rotation.y = Math.PI;
+      var truck = game.parked.truck;
+      truck.mesh.position.set(154, 0, 414); truck.mesh.rotation.y = -0.4;
+      game.missions.index = 1; game.missions.step = 0;
+      game.hud.banner('MISSION PASSED!', '+$5,000  ·  GAME SAVED');
+      lookAt(game, 136, 8, 442, 141, 1.5, 398);
     }
-    state.wanted.level = 2;
-    state.money = 250;
-    state.interactPrompt = '[E] STEAL CAR';
-    // Hold the trigger for a moment so shots are actually fired (ammo 12 -> 8).
-    simulate(state, 1.2, { axes: { forward: 0, strafe: 0, sprint: false, handbrake: false }, mouse: { x: 900, y: 360, down: true } });
-    // Leave two fresh tracers in the air for the frame. Shots fired along
-    // the camera's view axis foreshorten to a dot, so send one bullet
-    // sideways first (pushed first, the muzzle flash still lands on the
-    // near bullet below): its tracer crosses the road as a visible line.
-    const la = state.player.angle + Math.PI / 2.3;
-    state.bullets.push({
-      x: state.player.x + Math.cos(la) * 120,
-      y: state.player.y + Math.sin(la) * 120,
-      vx: Math.cos(la) * 900, vy: Math.sin(la) * 900,
-      damage: 34, fromPlayer: true, life: 0.4,
-    });
-    const a = state.player.angle;
-    for (const dist of [60, 150]) {
-      state.bullets.push({
-        x: state.player.x + Math.cos(a) * dist,
-        y: state.player.y + Math.sin(a) * dist,
-        vx: Math.cos(a) * 900, vy: Math.sin(a) * 900,
-        damage: 34, fromPlayer: true, life: 0.4,
-      });
-    }
-    state.player.weapons.pistol.ammo = 8;
-    state.player.weapons.pistol.reserve = 96;
-    return { screen: SCREEN_PLAY, camYaw: 0.27 };
-  }
-  if (name === 'chase') {
-    // Driving east down a downtown avenue at speed, three police cars on the tail,
-    // Wanted 4, skid marks behind, a roadblock ahead. Money still $250: the
-    // mission reward only lands when the mission passes.
-    state.player.x = 1600;
-    state.player.y = 1400;
-    const car = placePlayerCar(state, 'sedan', 1600, 1400, 0, 430);
-    state.skids.push(
-      { x: 1520, y: 1400, angle: 0, life: 6 },
-      { x: 1470, y: 1402, angle: 0.1, life: 6 },
-      { x: 1420, y: 1398, angle: -0.08, life: 6 },
-    );
-    placePoliceChase(state, 1600, 1400, 0);
-    state.cars.push({
-      id: 7201, type: 'police', x: 2400, y: 1330, angle: Math.PI / 2, speed: 0, targetSpeed: 0,
-      color: '#1d2f45', isTraffic: false, isPolice: true, isPlayer: false, hp: 500, roadblock: true,
-    });
-    state.cars.push({
-      id: 7202, type: 'police', x: 2400, y: 1470, angle: Math.PI / 2, speed: 0, targetSpeed: 0,
-      color: '#1d2f45', isTraffic: false, isPolice: true, isPlayer: false, hp: 500, roadblock: true,
-    });
-    state.wanted.level = 4;
-    state.money = 250;
-    state.camYaw = 0;
-    simulate(state, 1.0, { axes: { forward: 1, strafe: 0, sprint: false, handbrake: false }, mouse: { x: 900, y: 360, down: false } });
-    state.player.car = car;
-    return { screen: SCREEN_PLAY, camYaw: 0 };
-  }
-  if (name === 'mission') {
-    // Mission passed at the safehouse: banner up, game saved, next marker on the map.
-    state.player.x = L.safehouse.x + 40;
-    state.player.y = L.safehouse.y + 130;
-    state.player.angle = -Math.PI / 2;
-    state.camYaw = -Math.PI / 2;
-    state.money = 5250;
-    state.missions.index = 1;
-    state.missions.stage = 'yard';
-    state.missions.banner = 'MISSION PASSED!';
-    state.missions.bannerSub = '+$5,000  ·  M1 · HOTWIRE AT PIER 9';
-    state.missions.bannerTimer = 3.2;
-    state.saveNotice = 2.5;
-    state.wanted.level = 0;
-    simulate(state, 1.0);
-    state.missions.banner = 'MISSION PASSED!';
-    state.missions.bannerSub = '+$5,000  ·  M1 · HOTWIRE AT PIER 9';
-    state.missions.bannerTimer = 3.2;
-    state.saveNotice = 2.5;
-    // Cinematic three-quarter view: player small at the safehouse, sign and
-    // street behind him, instead of the follow camera right on his back.
-    // Camera panned slightly left so the neon SAFEHOUSE sign sits clear of
-    // the MISSION PASSED banner's right edge.
-    return {
-      screen: SCREEN_PLAY,
-      cinematic: { pos: { x: -860, y: 75, z: 740 }, look: { x: -1060, y: 45, z: 658 } },
-    };
-  }
-  // start (default): the title screen over a living city, wide sunset shot.
-  state.hasSave = true; // stage a save so the LOAD SAVE line shows on the title
-  simulate(state, 8);
-  return {
-    screen: SCREEN_TITLE,
-    cinematic: { pos: { x: 760, y: 330, z: 620 }, look: { x: -350, y: 50, z: -260 } },
+    game.frozen = true;
+    game.hud.update(game);
+    game.hud.drawMinimap(game);
   };
-}
+})();
