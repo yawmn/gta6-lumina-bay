@@ -1,11 +1,20 @@
-// IRON BAYOU: RUSTLINE — every tuning number and colour in one place.
-// The world is a fixed 3200x2400 industrial port city; the renderer shows a 1280x720
-// window of it through a camera that follows the player. No rule below depends on the
-// size of the browser window, so a screenshot always frames the same game.
+// IRON BAYOU: RUSTLINE (3D) — every tuning number and colour in one place.
+// The simulation still runs on the 2D city plane (3200x2400 world units); the 3D
+// layer maps (x, y) to (x - 1600, 0, y - 1200) and an angle a to rotation.y = -a.
+// No rule below depends on the size of the browser window.
 
 export const VIEW = { width: 1280, height: 720 };
 export const WORLD = { width: 3200, height: 2400 };
 export const STEP = 1 / 60;
+
+/** 2D (x, y) to Three.js (x, y, z): the world is centred on the origin. */
+export function to3(x, y) {
+  return { x: x - WORLD.width / 2, z: y - WORLD.height / 2 };
+}
+/** A 2D heading angle to a Three.js Y rotation (local +X is forward). */
+export function angleToRotY(a) {
+  return -a;
+}
 
 export const PALETTE = {
   grass: '#20261f',
@@ -26,7 +35,7 @@ export const PALETTE = {
   money: '#2ec4b6',
   text: '#f2f4f6',
   muted: '#9aa3b0',
-  panel: 'rgba(12, 15, 20, 0.78)',
+  panel: 'rgba(15, 19, 26, 0.94)',
   shadow: 'rgba(0, 0, 0, 0.45)',
 };
 
@@ -75,3 +84,33 @@ export const MISSIONS = [
 export const SAVE_KEY = 'iron-bayou-save-v1';
 export const RADIO_STATION = 'RUST FM 94.2';
 export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+// 3D presentation: sunset over Cinderport. The sun hangs low in the west so the
+// long shadows rake across the avenues; the sky grades from deep violet overhead
+// to burnt orange at the horizon, and a warm haze fogs the far blocks.
+export const SKY = {
+  top: '#1b1038',
+  mid: '#4a2350',
+  horizon: '#ff7a2a',
+  sunColor: '#ffb36b',
+  sunIntensity: 1.5,
+  ambientColor: '#6a5a8a',
+  ambientIntensity: 0.55,
+  fogColor: '#3a2140',
+  fogNear: 700,
+  fogFar: 2600,
+};
+
+export const CAMERA = {
+  fov: 58,
+  near: 1,
+  far: 5000,
+  footDistance: 115,
+  footHeight: 52,
+  driveDistance: 150,
+  driveHeight: 56,
+  lerp: 0.14,
+};
+
+export const PLAYER_HEIGHT = 34;
+export const CAR_HEIGHT = 26;

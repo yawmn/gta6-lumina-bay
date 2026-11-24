@@ -1,8 +1,7 @@
-// Input: keyboard and mouse, written for this game. Held keys steer on foot and in a
-// car; one-shot presses (confirm, pause, interact, reload, weapon swap, mute) are
-// queued as bit flags and taken once by the loop, so a press between two frames is
-// never lost and never counted twice. The mouse position is tracked in canvas pixels
-// so the player can aim with it.
+// Input (3D): keyboard and mouse for a third-person game. Held keys steer on foot
+// and in a car; one-shot presses are queued as bit flags and taken once by the
+// loop. The mouse orbits the camera: pointer lock while playing, drag as a
+// fallback. Clicking fires (and, on desktop, locks the pointer).
 
 export const ACTION_CONFIRM = 1;
 export const ACTION_PAUSE = 2;
@@ -19,7 +18,8 @@ const PAUSE = new Set(['KeyP', 'Escape']);
 export function createInput(canvas) {
   const keys = new Set();
   let actions = 0;
-  const mouse = { x: 640, y: 360, down: false };
+  const mouse = { x: 640, y: 360, down: false, dx: 0, dy: 0 };
+  let dragging = false;
 
   window.addEventListener('keydown', (event) => {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
@@ -40,21 +40,39 @@ export function createInput(canvas) {
   window.addEventListener('blur', () => {
     keys.clear();
     mouse.down = false;
+    dragging = false;
   });
   canvas.addEventListener('pointermove', (event) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
     mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+    if (document.pointerLockElement === canvas) {
+      mouse.dx += event.movementX || 0;
+      mouse.dy += event.movementY || 0;
+    } else if (dragging) {
+      mouse.dx += event.movementX || 0;
+      mouse.dy += event.movementY || 0;
+    }
   });
   canvas.addEventListener('pointerdown', (event) => {
     mouse.down = true;
+    dragging = true;
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
     mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
     if (event.button === 0) actions |= ACTION_CONFIRM;
+    if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+      try {
+        const p = canvas.requestPointerLock();
+        if (p && p.catch) p.catch(() => {});
+      } catch {
+        // Pointer lock is a nicety; drag-orbit works without it.
+      }
+    }
   });
   window.addEventListener('pointerup', () => {
     mouse.down = false;
+    dragging = false;
   });
 
   return {
@@ -62,6 +80,13 @@ export function createInput(canvas) {
     mouse,
     isDown(code) {
       return keys.has(code);
+    },
+    /** Mouse orbit deltas since the last take, in pixels. */
+    takeLook() {
+      const out = { dx: mouse.dx, dy: mouse.dy };
+      mouse.dx = 0;
+      mouse.dy = 0;
+      return out;
     },
     /** Forward/back/left/right as -1, 0 or 1, from WASD or the arrow keys. */
     axes() {

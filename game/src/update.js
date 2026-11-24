@@ -1,7 +1,8 @@
-// updateGame: one fixed step of the whole simulation, used by the live loop and
-// by the screenshot scenes alike. The player (on foot or driving), traffic, peds,
-// police, bullets, guards, pickups, particles and missions all advance here, in
-// that order, so a ?shot= scene is the same game a player plays, just staged.
+// updateGame (3D): one fixed step of the whole simulation. The simulation still
+// runs on the 2D city plane; the 3D layer only presents it. Movement on foot is
+// camera-relative: W runs where the camera looks (state.camYaw), D strafes to the
+// camera's right, and the player aims along the camera when firing. Driving is
+// car-relative and unchanged from the 2D game.
 
 import { PLAYER, VEHICLE_TYPES, WORLD } from './config.js';
 import { buildingAt, collideCircle, isInWater } from './WorldMap.js';
@@ -71,19 +72,32 @@ export function updateGame(state, input, dt) {
   }
   if (state.saveNotice > 0) state.saveNotice -= dt;
 
+  const axes = typeof input.axes === 'function' ? input.axes() : input.axes;
+
   if (player.onFoot) {
-    // The live loop passes the input object (axes is a method); the screenshot
-    // scenes pass a plain scripted input (axes is a value). Accept both.
-    const axes = typeof input.axes === 'function' ? input.axes() : input.axes;
     const speed = axes.sprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
-    player.x += axes.strafe * speed * dt;
-    player.y -= axes.forward * speed * dt;
-    const wx = input.mouse.x + state.camera.x;
-    const wy = input.mouse.y + state.camera.y;
-    player.angle = Math.atan2(wy - player.y, wx - player.x);
+    // Camera-relative: forward is where the camera looks, right is the camera's
+    // right on the ground plane.
+    const fx = Math.cos(state.camYaw);
+    const fy = Math.sin(state.camYaw);
+    const rx = -Math.sin(state.camYaw);
+    const ry = Math.cos(state.camYaw);
+    let mx = fx * axes.forward + rx * axes.strafe;
+    let my = fy * axes.forward + ry * axes.strafe;
+    const ml = Math.hypot(mx, my);
+    if (ml > 0.01) {
+      mx /= ml;
+      my /= ml;
+      player.x += mx * speed * dt;
+      player.y += my * speed * dt;
+      player.angle = Math.atan2(my, mx);
+      player.moving = true;
+    } else {
+      player.moving = false;
+    }
+    if (input.mouse.down) player.angle = state.camYaw;
     collideCircle(state.world, player, PLAYER.radius);
     if (input.mouse.down) fireWeapon(state);
-    // A traffic car that runs the player down hurts.
     for (const car of state.cars) {
       if (!car.isTraffic) continue;
       if (Math.hypot(car.x - player.x, car.y - player.y) < 42 && Math.abs(car.speed) > 40) {
@@ -94,7 +108,6 @@ export function updateGame(state, input, dt) {
   } else if (player.car) {
     const car = player.car;
     const spec = VEHICLE_TYPES[car.type];
-    const axes = typeof input.axes === 'function' ? input.axes() : input.axes;
     const prevX = car.x;
     const prevY = car.y;
     if (axes.forward !== 0) car.speed += axes.forward * spec.accel * dt;
@@ -115,7 +128,6 @@ export function updateGame(state, input, dt) {
       car.y = prevY;
       car.speed *= -0.25;
     }
-    // Shunt traffic cars out of the way.
     for (const other of state.cars) {
       if (other === car || other.isPlayer) continue;
       const d = Math.hypot(other.x - car.x, other.y - car.y);
@@ -144,11 +156,8 @@ export function updateGame(state, input, dt) {
   updateParticles(state, dt);
   updateMissions(state, dt);
 
-  // Camera follows the player, clamped to the city.
-  const tx = player.x - 640;
-  const ty = player.y - 360;
-  state.camera.x = clamp(tx, 0, WORLD.width - 1280);
-  state.camera.y = clamp(ty, 0, WORLD.height - 720);
+  state.camera.x = player.x;
+  state.camera.y = player.y;
 }
 
 export function interact(state) {

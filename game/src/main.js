@@ -1,9 +1,9 @@
-// Boot and the one loop: input is read every frame, the simulation advances in fixed
-// 1/60 s steps (several in a slow frame, none in a fast one), and the renderer paints
-// what is there. The game moves between four screens: title, play, paused and game
-// over. ?seed=N fixes the city. ?shot=start|steal|chase|mission (with &seed=N)
-// stages that scene instead of running the loop, paints it twice and sets
-// window.__shotReady for a screenshot.
+// Boot and the one loop (3D): input is read every frame, the simulation advances
+// in fixed 1/60 s steps, and the Three.js renderer paints what is there. The game
+// moves between four screens: title, play, paused and game over. ?seed=N fixes
+// the city. ?shot=start|steal|chase|mission (with &seed=N) stages that scene
+// instead of running the loop, paints it a few times and sets window.__shotReady
+// for a screenshot.
 
 import { PLAYER, STEP, VIEW, WEAPONS } from './config.js';
 import { createRandom } from './random.js';
@@ -13,7 +13,7 @@ import { createSoundEngine } from './audio.js';
 import { spawnTraffic } from './TrafficAI.js';
 import { spawnPedestrians } from './PedestrianAI.js';
 import { createMissions } from './MissionManager.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render3d.js';
 import { interact, refreshInteractPrompt, updateGame } from './update.js';
 import { hasSave, readSave, writeSave } from './SaveSystem.js';
 import { stageShot } from './shots.js';
@@ -45,9 +45,11 @@ export function createGame(seedValue, saveData) {
     saveNotice: 0,
     interactPrompt: '',
     hasSave: hasSave(),
+    camYaw: -Math.PI / 2,
+    camPitch: 0,
     player: {
       x: start.x, y: start.y, angle: -Math.PI / 2,
-      onFoot: true, car: null,
+      onFoot: true, car: null, moving: false,
       hp: PLAYER.maxHp, armor: 0,
       weapon: 'pistol',
       weapons: {
@@ -70,12 +72,11 @@ export function createGame(seedValue, saveData) {
       { kind: 'armor', x: world.landmarks.downtown.x + 120, y: world.landmarks.downtown.y - 60, value: 0 },
     ],
     missions: createMissions(),
-    camera: { x: 0, y: 0 },
+    camera: { x: start.x, y: start.y },
     stats: { shots: 0, kills: 0, steals: 0 },
     sound: createSoundEngine(),
   };
   state.cars = spawnTraffic(random, 16);
-  // A couple of parked cars near the start so the player can drive right away.
   state.cars.push(
     { id: 6001, type: 'sedan', x: 1080, y: 1470, angle: 0, speed: 0, targetSpeed: 0, color: '#3e6b8f', isTraffic: false, isPolice: false, isPlayer: false, hp: 100 },
     { id: 6002, type: 'taxi', x: 920, y: 1330, angle: Math.PI, speed: 0, targetSpeed: 0, color: '#f5b700', isTraffic: false, isPolice: false, isPlayer: false, hp: 100 },
@@ -92,14 +93,13 @@ export function createGame(seedValue, saveData) {
     state.wanted.level = saveData.wanted ?? 0;
     if (saveData.weapons) state.player.weapons = saveData.weapons;
   }
-  state.camera.x = Math.max(0, Math.min(3200 - VIEW.width, state.player.x - VIEW.width / 2));
-  state.camera.y = Math.max(0, Math.min(2400 - VIEW.height, state.player.y - VIEW.height / 2));
   return state;
 }
 
 function runShot(name) {
   const state = createGame(seed);
   window.__game = state;
+  const renderer = createRenderer(canvas);
   let scene;
   try {
     scene = stageShot(name, state);
@@ -107,12 +107,14 @@ function runShot(name) {
     window.__shotError = String(error && error.message ? error.message : error);
     scene = { screen: SCREEN_TITLE };
   }
-  const renderer = createRenderer(canvas);
+  if (scene.camYaw !== undefined) state.camYaw = scene.camYaw;
+  if (scene.cinematic) renderer.setCinematic(scene.cinematic.pos, scene.cinematic.look);
+  else renderer.snapCamera(state);
   let painted = 0;
   function paint() {
-    renderer.draw(state, scene.screen);
+    renderer.draw(state, scene.screen, STEP);
     painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
+    if (painted < 3) requestAnimationFrame(paint);
     else window.__shotReady = true;
   }
   requestAnimationFrame(paint);
@@ -126,6 +128,7 @@ function runGame() {
   let screen = SCREEN_TITLE;
   let accumulator = 0;
   let last = performance.now();
+  let lastLookAt = 0;
 
   function announce(message) {
     status.textContent = message;
@@ -142,6 +145,13 @@ function runGame() {
     announce('Playing. Vance is on the streets of Cinderport.');
   }
 
+  function angDiff(a, b) {
+    let d = a - b;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+
   function handleActions() {
     const actions = input.takeActions();
     if (actions & ACTION_MUTE) {
@@ -150,7 +160,7 @@ function runGame() {
     }
     if (screen === SCREEN_TITLE) {
       if (actions & ACTION_CONFIRM) startGame(false);
-      else if (input.isDown('KeyC') && state.hasSave) startGame(true);
+      else if ((input.isDown('KeyC') || input.isDown('KeyL')) && state.hasSave) startGame(true);
       return;
     }
     if (screen === SCREEN_OVER) {
@@ -180,8 +190,17 @@ function runGame() {
     accumulator += Math.min((now - last) / 1000, MAX_FRAME);
     last = now;
     handleActions();
+    // Mouse orbit: pointer-lock deltas steer the camera; while driving the
+    // camera also eases back behind the car when the mouse is idle.
+    const look = input.takeLook();
+    if (look.dx !== 0 || look.dy !== 0) {
+      state.camYaw -= look.dx * 0.0032;
+      state.camPitch = Math.max(-0.2, Math.min(0.4, state.camPitch + look.dy * 0.002));
+      lastLookAt = state.time;
+    } else if (state.player.car && state.time - lastLookAt > 1.5) {
+      state.camYaw += angDiff(state.player.car.angle, state.camYaw) * Math.min(1, 1.4 * STEP);
+    }
     if (screen === SCREEN_TITLE) {
-      // The city lives behind the title: traffic and pedestrians keep moving.
       while (accumulator >= STEP) {
         updateGame(state, { axes: { forward: 0, strafe: 0, sprint: false, handbrake: false }, mouse: { x: 640, y: 360, down: false } }, STEP);
         accumulator -= STEP;
@@ -204,9 +223,15 @@ function runGame() {
     } else {
       accumulator = 0;
     }
-    renderer.draw(state, screen);
+    renderer.draw(state, screen, STEP);
   }
 
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement !== canvas && screen === SCREEN_PLAY && !document.hidden) {
+      screen = SCREEN_PAUSED;
+      announce('Paused.');
+    }
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && screen === SCREEN_PLAY) {
       screen = SCREEN_PAUSED;
